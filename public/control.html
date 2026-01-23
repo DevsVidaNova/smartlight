@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Controle de Luz</title>
+    <style>
+      body {
+        font-family: system-ui, Arial;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: #f6f7f9;
+      }
+      .card {
+        background: #fff;
+        padding: 24px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        width: 360px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 8px 0 16px;
+        color: #333;
+      }
+      button {
+        width: 100%;
+        padding: 12px;
+        border: 0;
+        border-radius: 6px;
+        background: #0a7;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button.off {
+        background: #d33;
+      }
+      button:hover {
+        filter: brightness(0.95);
+      }
+      .status {
+        margin-top: 12px;
+        font-size: 13px;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Controle de Luz 1</h1>
+      <p>Pressione para enviar: "liga luz 1" ou "desligue a luz 1".</p>
+      <button id="toggleBtn">Liga luz 1</button>
+      <div class="status" id="status">Status: desconhecido</div>
+    </div>
+    <script>
+      async function refresh() {
+        const res = await fetch("/status");
+        const data = await res.json();
+        const btn = document.getElementById("toggleBtn");
+        const status = document.getElementById("status");
+        if (data.on) {
+          btn.textContent = "Desligue a luz 1";
+          btn.classList.add("off");
+        } else {
+          btn.textContent = "Liga luz 1";
+          btn.classList.remove("off");
+        }
+        status.textContent = `Status: ${data.on ? "ligada" : "desligada"} | tópico: ${data.topic}`;
+      }
+      document
+        .getElementById("toggleBtn")
+        .addEventListener("click", async () => {
+          const res = await fetch("/toggle", { method: "POST" });
+          const data = await res.json();
+          const btn = document.getElementById("toggleBtn");
+          const status = document.getElementById("status");
+          if (data.on) {
+            btn.textContent = "Desligue a luz 1";
+            btn.classList.add("off");
+          } else {
+            btn.textContent = "Liga luz 1";
+            btn.classList.remove("off");
+          }
+          status.textContent = `Status: ${data.on ? "ligada" : "desligada"} | tópico: ${data.topic} | mensagem: ${data.message}`;
+        });
+      refresh();
+    </script>
+  </body>
+</html>
