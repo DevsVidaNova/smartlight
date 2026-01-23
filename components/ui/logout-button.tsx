@@ -28,11 +28,9 @@ export function LogoutButton({
     <Button
       className={className}
       variant={
-        variant === "link"
+        variant === "link" || variant === "secondary" || variant === "ghost"
           ? "outline"
-          : variant === "secondary"
-            ? "default"
-            : variant
+          : variant
       }
       onClick={onClick}
     >
