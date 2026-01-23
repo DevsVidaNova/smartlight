@@ -3,7 +3,7 @@ import "./globals.css";
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "LightON",
+  title: "SmartLight",
   description: "Controle de luz via MQTT",
 };
 
