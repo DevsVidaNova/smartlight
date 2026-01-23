@@ -17,7 +17,7 @@ export function MobileNav() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="ml-3 text-sm font-semibold">LightON</div>
+          <div className="ml-3 text-lg font-semibold">Smart Light</div>
         </div>
       </header>
       {open ? (
@@ -67,4 +67,3 @@ export function MobileNav() {
     </>
   );
 }
-
