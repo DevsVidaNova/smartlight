@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 
 export const metadata = {
   title: "VidaNova | Smart",
-  description: "Controle de luz inteligente via MQTT",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

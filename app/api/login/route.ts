@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json(
-    { message: "Credenciais inválidas" },
+    { message: "Usuário ou senha inválidos" },
     { status: 401 },
   );
 }
