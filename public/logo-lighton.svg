@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 64">
+  <rect width="320" height="64" rx="8" fill="none"/>
+  <g fill="#e6edf7">
+    <text x="16" y="42" font-family="system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, 'Apple Color Emoji','Segoe UI Emoji'" font-size="32" font-weight="600">Light</text>
+  </g>
+  <g>
+    <rect x="138" y="16" width="66" height="32" rx="8" fill="#00a776"/>
+    <text x="149" y="42" font-family="system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, 'Apple Color Emoji','Segoe UI Emoji'" font-size="24" font-weight="700" fill="#ffffff">ON</text>
+  </g>
+  <g transform="translate(240,8)">
+    <circle cx="24" cy="24" r="18" fill="none" stroke="#00a776" stroke-width="4"/>
+    <line x1="24" y1="10" x2="24" y2="22" stroke="#00a776" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

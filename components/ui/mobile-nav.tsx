@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Wifi, Lightbulb, LogOut, Menu, X } from "lucide-react";
 import { LogoutButton } from "./logout-button";
+import { LogoSmall } from "./logo-small";
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
@@ -17,7 +18,7 @@ export function MobileNav() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="ml-3 text-lg font-semibold">Smart Light</div>
+          <LogoSmall className="ml-3" />
         </div>
       </header>
       {open ? (
@@ -28,7 +29,7 @@ export function MobileNav() {
           />
           <aside className="fixed top-0 left-0 z-50 h-full w-64 border-r bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4 md:hidden">
             <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-semibold">LightON</div>
+              <LogoSmall className="text-sm" />
               <button
                 aria-label="Fechar menu"
                 className="p-2 rounded-md hover:bg-[hsl(var(--accent))]"

@@ -2,12 +2,13 @@
 import Link from "next/link";
 import { LogoutButton } from "./logout-button";
 import { Wifi, Lightbulb, LogOut } from "lucide-react";
+import { LogoSmall } from "./logo-small";
 
 export function Sidebar() {
   return (
     <aside className="hidden md:block fixed left-0 top-0 h-screen w-64 border-r bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4">
-      <div className="text-sm font-semibold mb-4">LightON</div>
       <nav className="flex flex-col gap-2">
+        <LogoSmall className="mb-4" />
         <div className="flex items-center justify-start">
           <Link
             aria-label="Configurar WiFi"

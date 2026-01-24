@@ -3,8 +3,16 @@ import "./globals.css";
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "SmartLight",
-  description: "Controle de luz via MQTT",
+  title: "VidaNova | Smart",
+  description: "Controle de luz inteligente via MQTT",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+  },
+};
+
+export const viewport = {
+  themeColor: "#00a776",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

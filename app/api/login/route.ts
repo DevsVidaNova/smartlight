@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   };
 
   const adminUser = process.env.ADMIN_USER || "admin";
-  const adminPass = process.env.ADMIN_PASS || "admin";
+  const adminPass = process.env.ADMIN_PASS || "vida2050";
 
   if (username === adminUser && password === adminPass) {
     const cookieStore = await cookies();
