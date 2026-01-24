@@ -80,12 +80,9 @@ export function ToggleCard() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Controle de Luz 1</CardTitle>
+            <CardTitle>Luzes do teto</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Envie o comando para ligar ou desligar a luz.
-            </p>
             <Button
               className="w-full h-12"
               variant={isOn ? "destructive" : "default"}
@@ -100,12 +97,12 @@ export function ToggleCard() {
               ) : isOn ? (
                 <>
                   <Lightbulb className="mr-2 h-5 w-5" />
-                  Desligar luz 1
+                  DESLIGAR
                 </>
               ) : (
                 <>
                   <Lightbulb className="mr-2 h-5 w-5" />
-                  Ligar luz 1
+                  LIGAR
                 </>
               )}
             </Button>
@@ -134,18 +131,18 @@ export function ToggleCard() {
                         : "hsl(var(--muted-foreground))",
                     }}
                   />
-                  <span className="text-sm">
+                  <span className="text-md">
                     {isOn ? "Luz ligada" : "Luz desligada"}
                   </span>
                 </>
               )}
             </div>
-            <div className="text-sm text-muted-foreground">
+            {/* <div className="text-sm text-muted-foreground">
               {status ? `Tópico: ${status.topic}` : "Tópico: indefinido"}
             </div>
             <div className="text-sm mt-2">
               {message ? `Mensagem: ${message}` : "Sem mensagens recentes"}
-            </div>
+            </div> */}
           </CardContent>
         </Card>
       </div>
