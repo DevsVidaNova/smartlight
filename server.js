@@ -40,14 +40,14 @@ const brokerPort = getArg("port") || process.env.MQTT_PORT;
 const topicHeartBeat = process.env.MQTT_HEARTBEAT_TOPIC;
 const topicRequest = process.env.MQTT_TOPIC;
 
-const adminUser = process.env.ADMIN_USER;
-const adminPass = process.env.ADMIN_PASS;
+const userMQTT = process.env.MQTT_USER;
+const passwordMQTT = process.env.MQTT_PASSWORD;
 const port = Number(process.env.PORT);
 
 const client = mqtt.connect(brokerUrl, {
-  port: Number(brokerPort),
-  username: adminUser,
-  password: adminPass,
+  port: 1883,
+  username: userMQTT,
+  password: passwordMQTT,
   reconnectPeriod: 2000,
   clean: true,
 });
@@ -74,7 +74,7 @@ app.get("/login", (req, res) => {
 
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
-  if (username === adminUser && password === adminPass) {
+  if (username === userMQTT && password === passwordMQTT) {
     req.session.authed = true;
     return res.redirect("/control");
   }
