@@ -14,7 +14,7 @@ export async function POST() {
   if (!session.authed) {
     return NextResponse.json({ message: "Não autorizado" }, { status: 401 });
   }
-  const result = await publishToggleAwaitOk(8000);
+  const result = await publishToggleAwaitOk();
   if (!result.ok) {
     return NextResponse.json(
       { ...result, message: "Sem confirmação do dispositivo" },

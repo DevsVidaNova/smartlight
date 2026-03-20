@@ -1,5 +1,29 @@
 const mqtt = require("mqtt");
 const { execFile, exec } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+
+function loadEnv(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const content = fs.readFileSync(filePath, "utf8");
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const idx = trimmed.indexOf("=");
+    if (idx <= 0) continue;
+    const key = trimmed.slice(0, idx).trim();
+    let value = trimmed.slice(idx + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
 
 function getArg(name) {
   const idx = process.argv.indexOf(`--${name}`);
@@ -7,18 +31,22 @@ function getArg(name) {
   return undefined;
 }
 
-const brokerUrl =
-  getArg("broker") ||
-  process.env.MQTT_BROKER ||
-  "mqtt://test.mosquitto.org:1883";
+loadEnv(path.join(__dirname, ".env"));
 
-const topic =
-  getArg("v2050/lighton1/vidanovajs") ||
-  process.env.MQTT_TOPIC ||
-  "v2050/lighton2/vidanovajs";
+function resolveBrokerUrl() {
+  const raw = (process.env.MQTT_BROKER || "").trim();
+  if (!raw) return "mqtt://mqtt.silvawesley.com";
+  if (/^[a-z]+:\/\//i.test(raw)) return raw;
+  return `mqtt://${raw}`;
+}
 
-const username = getArg("username") || process.env.MQTT_USERNAME;
-const password = getArg("password") || process.env.MQTT_PASSWORD;
+const brokerUrl = resolveBrokerUrl();
+const brokerPort = process.env.MQTT_PORT;
+
+const topicRequest = process.env.MQTT_TOPIC || "v2050/lighton2/vidanovajs";
+
+const username = process.env.MQTT_USER || process.env.MQTT_USERNAME;
+const password = process.env.MQTT_PASSWORD || process.env.MQTT_PASS;
 const clientId =
   getArg("clientId") ||
   process.env.MQTT_CLIENT_ID ||
@@ -27,32 +55,37 @@ const clientId =
 const intervalMs = Number(
   getArg("interval") || process.env.MQTT_PUBLISH_INTERVAL || 0,
 );
+const mqttPort = Number(brokerPort);
 
 const client = mqtt.connect(brokerUrl, {
   clientId,
-  username,
-  password,
+  ...(username ? { username } : {}),
+  ...(password ? { password } : {}),
+  ...(Number.isFinite(mqttPort) ? { port: mqttPort } : {}),
   reconnectPeriod: 2000,
   clean: true,
 });
 
 client.on("connect", () => {
   console.log(`Conectado a ${brokerUrl} como ${clientId}`);
-  client.subscribe(topic, { qos: 0 }, (err) => {
+  console.log(`Tópico de request: ${topicRequest}`);
+  client.subscribe(topicRequest, { qos: 0 }, (err) => {
     if (err) {
-      console.error(`Erro ao subscrever ${topic}: ${err.message || err}`);
+      console.error(
+        `Erro ao subscrever ${topicRequest}: ${err.message || err}`,
+      );
       return;
     }
     const msg = `Olá liga luz 1 ${new Date().toISOString()}`;
-    client.publish(topic, msg, { qos: 0 });
-    console.log(`Publicado em ${topic}: ${msg}`);
+    client.publish(topicRequest, msg, { qos: 0 });
+    console.log(`Publicado em ${topicRequest}: ${msg}`);
   });
 
   if (intervalMs > 0) {
     setInterval(() => {
       const msg = `Ping ${new Date().toISOString()}`;
-      client.publish(topic, msg, { qos: 0 });
-      console.log(`Publicado em ${topic}: ${msg}`);
+      client.publish(topicRequest, msg, { qos: 0 });
+      console.log(`Publicado em ${topicRequest}: ${msg}`);
     }, intervalMs);
   }
 });
@@ -77,6 +110,12 @@ client.on("message", (t, payload) => {
 
 client.on("error", (err) => {
   console.error(`Erro: ${err.message || err}`);
+  const message = String(err?.message || "").toLowerCase();
+  if (message.includes("not authorized")) {
+    console.error(
+      "Falha de autenticação MQTT. Defina MQTT_USER/MQTT_PASSWORD no .env.",
+    );
+  }
 });
 
 client.on("reconnect", () => {

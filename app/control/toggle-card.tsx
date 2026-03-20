@@ -5,13 +5,23 @@ import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lightbulb, Loader2 } from "lucide-react";
+import { HeartbeatCard, type HeartbeatData } from "./heartbeat-card";
 
-type Status = { on: boolean; topic: string };
+type StatusResponse = { on: boolean; topic: string; heartbeat?: HeartbeatData };
+type ToggleResponse = StatusResponse & { message: string; ok?: boolean };
+type ToggleEvent = {
+  kind?: "toggle";
+  on?: boolean;
+  topic?: string;
+  raw?: string;
+};
+type HeartbeatEvent = { kind?: "heartbeat"; heartbeat?: HeartbeatData };
 
 export function ToggleCard() {
-  const [status, setStatus] = useState<Status | null>(null);
+  const [status, setStatus] = useState<StatusResponse | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [now, setNow] = useState<number>(Date.now());
   const router = useRouter();
 
   async function refresh() {
@@ -20,7 +30,7 @@ export function ToggleCard() {
       router.replace("/login");
       return;
     }
-    const data = (await res.json()) as Status;
+    const data = (await res.json()) as StatusResponse;
     setStatus(data);
   }
 
@@ -29,23 +39,20 @@ export function ToggleCard() {
     setMessage("Aguardando resposta do dispositivo...");
     const res = await fetch("/api/toggle", { method: "POST" });
     if (res.status === 401) {
+      setPending(false);
       router.replace("/login");
       return;
     }
-    const data = (await res.json()) as Status & {
-      message: string;
-      ok?: boolean;
-    };
+    const data = (await res.json()) as ToggleResponse;
     if (data.ok) {
-      setStatus({ on: data.on, topic: data.topic });
+      setStatus((prev) => ({
+        on: data.on,
+        topic: data.topic,
+        heartbeat: prev?.heartbeat,
+      }));
     }
     setMessage(data.message);
     setPending(false);
-  }
-
-  async function logout() {
-    await fetch("/api/logout", { method: "POST" });
-    router.replace("/login");
   }
 
   useEffect(() => {
@@ -53,19 +60,28 @@ export function ToggleCard() {
     const es = new EventSource("/api/events");
     es.onmessage = (e) => {
       try {
-        const data = JSON.parse(e.data) as {
-          on?: boolean;
-          topic?: string;
-          raw?: string;
-        };
-        setStatus((prev) => {
-          const nextOn =
-            typeof data.on === "boolean" ? data.on : (prev?.on ?? false);
-          const nextTopic = data.topic ?? prev?.topic ?? "";
-          return { on: nextOn, topic: nextTopic };
-        });
-        setMessage(data.raw ? `Confirmação: ${data.raw}` : null);
-        if (typeof data.on === "boolean") setPending(false);
+        const data = JSON.parse(e.data) as ToggleEvent | HeartbeatEvent;
+        if ("heartbeat" in data && data.heartbeat) {
+          setStatus((prev) => ({
+            on: prev?.on ?? false,
+            topic: prev?.topic ?? "",
+            heartbeat: data.heartbeat,
+          }));
+        }
+        if ("on" in data || "topic" in data) {
+          setStatus((prev) => {
+            const nextOn =
+              typeof data.on === "boolean" ? data.on : (prev?.on ?? false);
+            const nextTopic = data.topic ?? prev?.topic ?? "";
+            return { on: nextOn, topic: nextTopic, heartbeat: prev?.heartbeat };
+          });
+          if (data.raw) {
+            setMessage(`Confirmação: ${data.raw}`);
+          }
+          if (typeof data.on === "boolean") {
+            setPending(false);
+          }
+        }
       } catch {}
     };
     return () => {
@@ -73,11 +89,20 @@ export function ToggleCard() {
     };
   }, []);
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
   const isOn = !!status?.on;
 
   return (
     <div className="container mx-auto min-h-screen px-4 py-8">
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Luzes do teto</CardTitle>
@@ -137,14 +162,12 @@ export function ToggleCard() {
                 </>
               )}
             </div>
-            {/* <div className="text-sm text-muted-foreground">
-              {status ? `Tópico: ${status.topic}` : "Tópico: indefinido"}
+            <div className="text-sm text-[hsl(var(--muted-foreground))]">
+              {message ? message : "Sem mensagens recentes"}
             </div>
-            <div className="text-sm mt-2">
-              {message ? `Mensagem: ${message}` : "Sem mensagens recentes"}
-            </div> */}
           </CardContent>
         </Card>
+        <HeartbeatCard heartbeat={status?.heartbeat ?? null} now={now} />
       </div>
     </div>
   );
