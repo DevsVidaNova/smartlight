@@ -35,7 +35,6 @@ function getArg(name) {
 }
 
 const brokerUrl = getArg("broker") || process.env.MQTT_BROKER;
-const brokerPort = getArg("port") || process.env.MQTT_PORT;
 
 const topicHeartBeat = process.env.MQTT_HEARTBEAT_TOPIC;
 const topicRequest = process.env.MQTT_TOPIC;
@@ -74,7 +73,10 @@ app.get("/login", (req, res) => {
 
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
-  if (username === userMQTT && password === passwordMQTT) {
+  if (
+    username === process.env.ADMIN_USER &&
+    password === process.env.ADMIN_PASSWORD
+  ) {
     req.session.authed = true;
     return res.redirect("/control");
   }

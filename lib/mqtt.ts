@@ -2,9 +2,9 @@ import mqtt from "mqtt";
 import { bus } from "./events";
 
 const brokerUrl = process.env.MQTT_BROKER;
-const brokerPort = process.env.MQTT_PORT;
-const user = process.env.MQTT_USER;
-const password = process.env.MQTT_PASSWORD;
+
+const userMQTT = process.env.MQTT_USER;
+const passwordMQTT = process.env.MQTT_PASSWORD;
 const controlTopic = process.env.MQTT_TOPIC || "v2050/request/vidanovajs";
 const responseTopic =
   process.env.MQTT_RESPONSE_TOPIC || "v2050/response/lightingvidanova";
@@ -169,11 +169,11 @@ function getHeartbeatStatus() {
 function ensureClient() {
   if (!client) {
     const resolvedBrokerUrl = resolveBrokerUrl();
-    const port = Number(brokerPort);
+    const port = 1883;
     client = mqtt.connect(resolvedBrokerUrl, {
       ...(Number.isFinite(port) ? { port } : {}),
-      ...(user ? { username: user } : {}),
-      ...(password ? { password } : {}),
+      ...(userMQTT ? { username: userMQTT } : {}),
+      ...(passwordMQTT ? { password: passwordMQTT } : {}),
       reconnectPeriod: 2000,
       clean: true,
     });
