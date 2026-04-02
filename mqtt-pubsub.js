@@ -1,5 +1,5 @@
 const mqtt = require("mqtt");
-const { execFile, exec } = require("child_process");
+const { execFile } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -76,9 +76,6 @@ client.on("connect", () => {
       );
       return;
     }
-    const msg = `Olá liga luz 1 ${new Date().toISOString()}`;
-    client.publish(topicRequest, msg, { qos: 0 });
-    console.log(`Publicado em ${topicRequest}: ${msg}`);
   });
 
   if (intervalMs > 0) {
