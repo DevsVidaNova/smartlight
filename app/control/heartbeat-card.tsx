@@ -24,7 +24,6 @@ export type HeartbeatData = {
 
 type Props = {
   heartbeat: HeartbeatData | null;
-  now: number;
 };
 
 type StatusResponse = {
@@ -48,7 +47,7 @@ function formatElapsed(ms: number) {
   return `${hours}h atrás`;
 }
 
-export function HeartbeatCard({ heartbeat, now }: Props) {
+export function HeartbeatCard({ heartbeat }: Props) {
   const staleMs = parsePositiveMs(
     process.env.NEXT_PUBLIC_HEARTBEAT_STALE_MS,
     10000,
@@ -60,6 +59,7 @@ export function HeartbeatCard({ heartbeat, now }: Props) {
   const [liveHeartbeat, setLiveHeartbeat] = useState<HeartbeatData | null>(
     heartbeat ?? null,
   );
+  const [now, setNow] = useState<number>(Date.now());
 
   useEffect(() => {
     setLiveHeartbeat(heartbeat ?? null);
@@ -87,6 +87,15 @@ export function HeartbeatCard({ heartbeat, now }: Props) {
       clearInterval(intervalId);
     };
   }, [pollMs]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
 
   const lastSeenAt = liveHeartbeat?.lastSeenAt ?? null;
   const hasBeat = lastSeenAt !== null;

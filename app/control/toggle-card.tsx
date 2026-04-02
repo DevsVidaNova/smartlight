@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,8 +90,10 @@ export function ToggleCard() {
     lightId: number;
     on: boolean;
   } | null>(null);
-  const [now, setNow] = useState<number>(Date.now());
   const router = useRouter();
+  const closeLightModal = useCallback(() => {
+    setIsLightModalOpen(false);
+  }, []);
 
   async function refresh() {
     const res = await fetch("/api/status");
@@ -297,15 +299,6 @@ export function ToggleCard() {
     };
   }, []);
 
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, []);
-
   const isOn = !!status?.on;
   const activeLights = Object.values(lights).filter(Boolean).length;
   const allLightsOn = activeLights === LIGHT_COUNT;
@@ -363,13 +356,13 @@ export function ToggleCard() {
             </div>
           </CardContent>
         </Card>
-        <HeartbeatCard heartbeat={status?.heartbeat ?? null} now={now} />
+        <HeartbeatCard heartbeat={status?.heartbeat ?? null} />
       </div>
       <LightGridModal
         open={isLightModalOpen}
         lights={lights}
         loadingByLight={loadingByLight}
-        onClose={() => setIsLightModalOpen(false)}
+        onClose={closeLightModal}
         onToggleLight={toggleLight}
       />
     </div>
