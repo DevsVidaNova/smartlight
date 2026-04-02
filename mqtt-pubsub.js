@@ -45,7 +45,7 @@ const brokerPort = process.env.MQTT_PORT;
 
 const topicRequest = process.env.MQTT_TOPIC || "v2050/lighton2/vidanovajs";
 
-const userMQTT = process.env.MQTT_USER;
+const userMQTT = process.env.MQTT_USER || process.env.MQTT_USERNAME;
 const passwordMQTT = process.env.MQTT_PASSWORD;
 const clientId =
   getArg("clientId") ||
@@ -59,8 +59,8 @@ const mqttPort = Number(brokerPort);
 
 const client = mqtt.connect(brokerUrl, {
   clientId,
-  ...(userMQTT ? { userMQTT } : {}),
-  ...(passwordMQTT ? { passwordMQTT } : {}),
+  ...(userMQTT ? { username: userMQTT } : {}),
+  ...(passwordMQTT ? { password: passwordMQTT } : {}),
   ...(Number.isFinite(mqttPort) ? { port: mqttPort } : {}),
   reconnectPeriod: 2000,
   clean: true,
@@ -100,10 +100,10 @@ client.on("message", (t, payload) => {
       try {
         execFile(appPath);
       } catch (e) {
-        exec(`start "" "https://mqtt-explorer.com"`);
+        // exec(`start "" "https://mqtt-explorer.com"`);
       }
     } else {
-      exec(`start "" "https://mqtt-explorer.com"`);
+      // exec(`start "" "https://mqtt-explorer.com"`);
     }
   }
 });
