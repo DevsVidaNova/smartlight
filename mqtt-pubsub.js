@@ -43,7 +43,8 @@ function resolveBrokerUrl() {
 const brokerUrl = resolveBrokerUrl();
 const brokerPort = process.env.MQTT_PORT;
 
-const topicRequest = process.env.MQTT_TOPIC;
+const topicRequestAllLights = process.env.MQTT_TOPIC;
+const topicRequestSingleLight = process.env.MQTT_REQUEST_TOPIC;
 
 const userMQTT = process.env.MQTT_USER || process.env.MQTT_USERNAME;
 const passwordMQTT = process.env.MQTT_PASSWORD;
@@ -68,11 +69,12 @@ const client = mqtt.connect(brokerUrl, {
 
 client.on("connect", () => {
   console.log(`Conectado a ${brokerUrl} como ${clientId}`);
-  console.log(`Tópico de request: ${topicRequest}`);
-  client.subscribe(topicRequest, { qos: 0 }, (err) => {
+  console.log(`Tópico de request: ${topicRequestAllLights}`);
+  console.log(`Tópico de request: ${topicRequestSingleLight}`);
+  client.subscribe(topicRequestAllLights, { qos: 0 }, (err) => {
     if (err) {
       console.error(
-        `Erro ao subscrever ${topicRequest}: ${err.message || err}`,
+        `Erro ao subscrever ${topicRequestAllLights}: ${err.message || err}`,
       );
       return;
     }
@@ -90,19 +92,7 @@ client.on("connect", () => {
 client.on("message", (t, payload) => {
   const text = payload.toString();
   console.log(`Recebido em ${t}: ${text}`);
-  const lower = text.toLowerCase();
-  if (lower.includes("liga luz 1")) {
-    const appPath = process.env.MQTT_EXPLORER_PATH;
-    if (appPath) {
-      try {
-        execFile(appPath);
-      } catch (e) {
-        // exec(`start "" "https://mqtt-explorer.com"`);
-      }
-    } else {
-      // exec(`start "" "https://mqtt-explorer.com"`);
-    }
-  }
+  return;
 });
 
 client.on("error", (err) => {

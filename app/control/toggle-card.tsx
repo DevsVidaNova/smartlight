@@ -64,7 +64,7 @@ function formatConfirmationMessage(raw: string) {
       return `Falha: ${baseError}${range}${action}`;
     }
     if (typeof parsed.luz === "number" && typeof parsed.ligada === "boolean") {
-      return `Confirmação: Luz ${parsed.luz} ${parsed.ligada ? "ligada" : "desligada"}`;
+      return `Confirmação: Luz ${parsed.luz + 1} ${parsed.ligada ? "ligada" : "desligada"}`;
     }
     if (typeof parsed.action === "string") {
       return `Confirmação: ${parsed.action}`;
@@ -142,7 +142,7 @@ export function ToggleCard() {
     }
     setLastLightStatus({ lightId, on: data.on });
     setMessage(
-      `${data.message}: Luz ${lightId} ${data.on ? "ligada" : "desligada"}`,
+      `${data.message}: Luz ${lightId + 1} ${data.on ? "ligada" : "desligada"}`,
     );
     setLoadingByLight((prev) => ({ ...prev, [lightId]: false }));
   }
@@ -154,7 +154,7 @@ export function ToggleCard() {
     const targetOn = !hasAnyOn;
     const targetLightIds = Array.from(
       { length: LIGHT_COUNT },
-      (_, index) => index + 1,
+      (_, index) => index,
     ).filter((lightId) => Boolean(previousLights[lightId]) !== targetOn);
     if (targetLightIds.length === 0) {
       setMessage(
@@ -221,7 +221,9 @@ export function ToggleCard() {
         return next;
       });
       setMessage(
-        `Falha em ${failedLightIds.length} luz(es): ${failedLightIds.join(", ")}`,
+        `Falha em ${failedLightIds.length} luz(es): ${failedLightIds
+          .map((id) => id + 1)
+          .join(", ")}`,
       );
     } else {
       setMessage(
@@ -301,7 +303,7 @@ export function ToggleCard() {
   const isOn = !!status?.on;
   const activeLights = Object.values(lights).filter(Boolean).length;
   const hasAnyLightOn = activeLights > 0;
-  const statusLightId = lastLightStatus?.lightId ?? 1;
+  const statusLightId = lastLightStatus?.lightId ?? 0;
   const statusLightOn = lastLightStatus
     ? lastLightStatus.on
     : Boolean(lights[statusLightId]);
@@ -353,7 +355,7 @@ export function ToggleCard() {
                 }}
               />
               <span className="text-md">
-                {`Luz ${statusLightId} ${statusLightOn ? "ligada" : "desligada"}`}
+                {`Luz ${statusLightId + 1} ${statusLightOn ? "ligada" : "desligada"}`}
               </span>
             </div>
             <div className="text-sm text-[hsl(var(--muted-foreground))]">

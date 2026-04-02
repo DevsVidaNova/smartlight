@@ -65,7 +65,7 @@ let heartbeatState: HeartbeatState = {
 
 function createInitialLightStates() {
   return Array.from({ length: LIGHT_COUNT }, (_, index) => {
-    const id = index + 1;
+    const id = index;
     return [id, false] as const;
   }).reduce<LightStateMap>((acc, [id, value]) => {
     acc[id] = value;
@@ -132,11 +132,11 @@ function parseLightUpdate(raw: string) {
       parseNumber(json.luzId) ??
       parseNumber(json.id) ??
       actionLightId ??
-      (typeof json.luz === "boolean" ? 1 : null) ??
-      (typeof json.on === "boolean" ? 1 : null) ??
-      (typeof json.ligada === "boolean" ? 1 : null);
-    if (!candidateId) return null;
-    if (candidateId < 1 || candidateId > LIGHT_COUNT) return null;
+      (typeof json.luz === "boolean" ? 0 : null) ??
+      (typeof json.on === "boolean" ? 0 : null) ??
+      (typeof json.ligada === "boolean" ? 0 : null);
+    if (candidateId === null) return null;
+    if (candidateId < 0 || candidateId >= LIGHT_COUNT) return null;
     const requestId =
       typeof json.requestId === "string" ? json.requestId : undefined;
     const callbackOk =
@@ -353,7 +353,7 @@ function ensureClient() {
         if (perLightUpdate) {
           if (perLightUpdate.ok !== false) {
             lightStates[perLightUpdate.lightId] = perLightUpdate.on;
-            if (perLightUpdate.lightId === 1) {
+            if (perLightUpdate.lightId === 0) {
               toggleOn = perLightUpdate.on;
             }
           }
@@ -387,13 +387,13 @@ function ensureClient() {
           try {
             const json = JSON.parse(raw) as Record<string, unknown>;
             const reported =
-              (perLightUpdate?.lightId === 1 ? perLightUpdate.on : null) ??
+              (perLightUpdate?.lightId === 0 ? perLightUpdate.on : null) ??
               parseBoolean(json.on) ??
               parseBoolean(json.ligada) ??
               (typeof json.luz === "boolean" ? json.luz : null);
             if (typeof reported === "boolean") {
               toggleOn = reported;
-              lightStates[1] = reported;
+              lightStates[0] = reported;
               const evt = {
                 kind: "toggle",
                 on: toggleOn,
@@ -483,13 +483,14 @@ function ensureClient() {
 
 export async function publishToggleAwaitOk(timeoutMs = 15000) {
   const targetOn = !toggleOn;
-  const message = targetOn ? "liga luz 1" : "desligue a luz 1";
+  const message = (lightId: number) =>
+    targetOn ? `ligue luz ${lightId}` : `desligue luz ${lightId}`;
   if (!controlTopic) {
     return {
       ok: false,
       on: toggleOn,
       topic: controlTopic,
-      message,
+      message: message(1),
       lights: getLightsStatus(),
     };
   }
@@ -524,7 +525,7 @@ export async function publishToggleAwaitOk(timeoutMs = 15000) {
       const isToggle = evt.kind === "toggle" && evt.on === targetOn;
       const isLight1Callback =
         evt.kind === "single-light-callback" &&
-        evt.lightId === 1 &&
+        evt.lightId === 0 &&
         evt.on === targetOn;
       if (isToggle || isLight1Callback) {
         bus.off("mqtt", handler as any);
@@ -539,8 +540,11 @@ export async function publishToggleAwaitOk(timeoutMs = 15000) {
       resolve(false);
     }, timeoutMs);
   });
-  console.log("[MQTT] Publicando controle", { controlTopic, message });
-  c.publish(controlTopic, message, { qos: 0 }, (err) => {
+  console.log("[MQTT] Publicando controle", {
+    controlTopic,
+    message: message(1),
+  });
+  c.publish(controlTopic, message(1), { qos: 0 }, (err) => {
     if (err) {
       console.log("[MQTT] Erro ao publicar", err);
     }
@@ -556,7 +560,7 @@ export async function publishToggleAwaitOk(timeoutMs = 15000) {
     ok,
     on: toggleOn,
     topic: controlTopic,
-    message,
+    message: message(1),
     lights: getLightsStatus(),
   };
 }
@@ -566,20 +570,20 @@ export async function publishLightState(
   targetOn: boolean,
   timeoutMs = 10000,
 ) {
-  if (!singleLightRequestTopic) {
+  if (!Number.isInteger(lightId) || lightId < 0 || lightId >= LIGHT_COUNT) {
     return {
       ok: false,
-      message: "MQTT_REQUEST_TOPIC não definido",
+      message: "Luz inválida",
       lightId,
       on: targetOn,
       topic: singleLightRequestTopic,
       lights: getLightsStatus(),
     };
   }
-  if (!Number.isInteger(lightId) || lightId < 1 || lightId > LIGHT_COUNT) {
+  if (!singleLightRequestTopic) {
     return {
       ok: false,
-      message: "Luz inválida",
+      message: "MQTT_REQUEST_TOPIC não definido",
       lightId,
       on: targetOn,
       topic: singleLightRequestTopic,
@@ -611,39 +615,27 @@ export async function publishLightState(
       lights: getLightsStatus(),
     };
   }
-  const requestId = `${lightId}${Date.now().toString(36)}${Math.random()
-    .toString(36)
-    .slice(2, 5)}`;
-  const message = JSON.stringify({
-    requestId,
-    lightId,
-    on: targetOn,
-    action: targetOn ? `liga luz ${lightId}` : `desligue a luz ${lightId}`,
-  });
+  const message = JSON.stringify({ lightId });
   const callbackPromise = new Promise<{
     ok: boolean;
     message: string;
-    requestId?: string;
   }>((resolve) => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const handler = (evt: {
       kind?: string;
       lightId?: number;
       on?: boolean;
-      requestId?: string;
       ok?: boolean;
       message?: string;
     }) => {
       if (evt.kind !== "single-light-callback") return;
-      const sameRequest = evt.requestId && evt.requestId === requestId;
-      const fallbackMatch = !evt.requestId && evt.lightId === lightId;
-      if (!sameRequest && !fallbackMatch) return;
+      if (evt.lightId !== lightId) return;
+      if (typeof evt.on === "boolean" && evt.on !== targetOn) return;
       if (timeoutId) clearTimeout(timeoutId);
       bus.off("mqtt", handler as any);
       resolve({
         ok: evt.ok !== false,
         message: evt.message || "Callback confirmado",
-        requestId: evt.requestId,
       });
     };
     bus.on("mqtt", handler as any);
@@ -683,7 +675,6 @@ export async function publishLightState(
       lightId,
       on: Boolean(lightStates[lightId]),
       topic: singleLightRequestTopic,
-      requestId,
       lights: getLightsStatus(),
     };
   }
@@ -693,7 +684,6 @@ export async function publishLightState(
     lightId,
     on: Boolean(lightStates[lightId]),
     topic: singleLightRequestTopic,
-    requestId,
     lights: getLightsStatus(),
   };
 }

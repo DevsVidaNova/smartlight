@@ -9,10 +9,10 @@ export type LightStateMap = Record<number, boolean>;
 
 export function createLightItems() {
   return Array.from({ length: LIGHT_COUNT }, (_, index) => {
-    const id = index + 1;
+    const id = index;
     return {
       id,
-      label: `Luz ${id}`,
+      label: `Luz ${id + 1}`,
     } satisfies LightItem;
   });
 }
