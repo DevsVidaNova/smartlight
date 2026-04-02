@@ -43,7 +43,7 @@ function resolveBrokerUrl() {
 const brokerUrl = resolveBrokerUrl();
 const brokerPort = process.env.MQTT_PORT;
 
-const topicRequest = process.env.MQTT_TOPIC || "v2050/lighton2/vidanovajs";
+const topicRequest = process.env.MQTT_TOPIC;
 
 const userMQTT = process.env.MQTT_USER || process.env.MQTT_USERNAME;
 const passwordMQTT = process.env.MQTT_PASSWORD;

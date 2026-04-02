@@ -5,19 +5,23 @@ const brokerUrl = process.env.MQTT_BROKER;
 
 const userMQTT = process.env.MQTT_USER;
 const passwordMQTT = process.env.MQTT_PASSWORD;
-const controlTopic = process.env.MQTT_TOPIC || "v2050/request/vidanovajs";
-const singleLightRequestTopic =
-  process.env.MQTT_REQUEST_TOPIC || "v1/client/request/singleLight";
+const configuredPort = (() => {
+  const raw = process.env.MQTT_PORT;
+  if (!raw) return null;
+  const parsed = Number(String(raw).trim());
+  return Number.isFinite(parsed) ? parsed : null;
+})();
+const controlTopic = process.env.MQTT_TOPIC;
+const singleLightRequestTopic = process.env.MQTT_REQUEST_TOPIC;
+const responseTopic = process.env.MQTT_RESPONSE_TOPIC;
 const singleLightCallbackTopic =
-  process.env.MQTT_SINGLE_LIGHT_CALLBACK_TOPIC ||
-  "v1/client/callback/singleLight";
-const responseTopic =
-  process.env.MQTT_RESPONSE_TOPIC || "v2050/response/lightingvidanova";
-const wifiTopic = process.env.MQTT_WIFI_TOPIC || "v2050/request/wifi";
-const configuredHeartbeatTopic = process.env.MQTT_HEARTBEAT_TOPIC?.trim() || "";
+  process.env.MQTT_SINGLE_LIGHT_CALLBACK_TOPIC || responseTopic;
+const wifiTopic = process.env.MQTT_WIFI_TOPIC;
+const configuredHeartbeatTopic = process.env.MQTT_HEARTBEAT_TOPIC || "";
 const heartbeatSubscribeTopics = configuredHeartbeatTopic
-  ? [configuredHeartbeatTopic]
-  : [];
+  .split(/[\n,]+/g)
+  .map((topic) => topic.trim())
+  .filter(Boolean);
 const LIGHT_COUNT = 16;
 
 type HeartbeatPayload = {
@@ -54,7 +58,7 @@ let toggleOn = false;
 let awaitingGlobalToggleAck = false;
 let lightStates: LightStateMap = createInitialLightStates();
 let heartbeatState: HeartbeatState = {
-  topic: configuredHeartbeatTopic,
+  topic: heartbeatSubscribeTopics[0] || "",
   lastSeenAt: null,
   payload: null,
 };
@@ -116,18 +120,21 @@ function parseLightUpdate(raw: string) {
       };
     })();
     const actionLightId = parsedAction?.id ?? null;
+    const candidateOn =
+      parseBoolean(json.on) ??
+      parseBoolean(json.luz) ??
+      parseBoolean(json.ligada) ??
+      parseBoolean(json.state);
     const candidateId =
       parseNumber(json.lightId) ??
       parseNumber(json.light) ??
       parseNumber(json.luz) ??
       parseNumber(json.luzId) ??
       parseNumber(json.id) ??
-      actionLightId;
-    const candidateOn =
-      parseBoolean(json.on) ??
-      parseBoolean(json.luz) ??
-      parseBoolean(json.ligada) ??
-      parseBoolean(json.state);
+      actionLightId ??
+      (typeof json.luz === "boolean" ? 1 : null) ??
+      (typeof json.on === "boolean" ? 1 : null) ??
+      (typeof json.ligada === "boolean" ? 1 : null);
     if (!candidateId) return null;
     if (candidateId < 1 || candidateId > LIGHT_COUNT) return null;
     const requestId =
@@ -297,7 +304,10 @@ function getHeartbeatStatus() {
 function ensureClient() {
   if (!client) {
     const resolvedBrokerUrl = resolveBrokerUrl();
-    const port = 1883;
+    if (!resolvedBrokerUrl) {
+      throw new Error("[MQTT] MQTT_BROKER não definido");
+    }
+    const port = configuredPort ?? 1883;
     client = mqtt.connect(resolvedBrokerUrl, {
       ...(Number.isFinite(port) ? { port } : {}),
       ...(userMQTT ? { username: userMQTT } : {}),
@@ -307,47 +317,39 @@ function ensureClient() {
     });
 
     client.on("connect", () => {
-      client?.subscribe(responseTopic, { qos: 0 }, (err) => {
-        if (err) {
-          console.log("[MQTT] Erro ao subscrever", responseTopic, err);
-        } else {
-          console.log("[MQTT] Subscreveu global", responseTopic);
-        }
-      });
-      client?.subscribe(singleLightCallbackTopic, { qos: 0 }, (err) => {
-        if (err) {
-          console.log(
-            "[MQTT] Erro ao subscrever callback luz individual",
-            singleLightCallbackTopic,
-            err,
-          );
-        } else {
-          console.log(
-            "[MQTT] Subscreveu callback luz individual",
-            singleLightCallbackTopic,
-          );
-        }
-      });
-      if (!configuredHeartbeatTopic) {
-        console.log(
-          "[MQTT] MQTT_HEARTBEAT_TOPIC não definido. Heartbeat não será subscrito.",
-        );
+      const subscribeTopics = Array.from(
+        new Set(
+          [responseTopic, singleLightCallbackTopic, ...heartbeatSubscribeTopics]
+            .map((topic) => (topic ?? "").trim())
+            .filter(Boolean),
+        ),
+      );
+
+      if (subscribeTopics.length === 0) {
+        console.log("[MQTT] Nenhum tópico para subscrever (verifique .env).");
+        return;
       }
-      for (const topic of heartbeatSubscribeTopics) {
+
+      for (const topic of subscribeTopics) {
         client?.subscribe(topic, { qos: 0 }, (err) => {
           if (err) {
-            console.log("[MQTT] Erro ao subscrever heartbeat", topic, err);
+            console.log("[MQTT] Erro ao subscrever", topic, err);
           } else {
-            console.log("[MQTT] Subscreveu heartbeat", topic);
+            console.log("[MQTT] Subscreveu", topic);
           }
         });
       }
     });
-    client.on("error", () => {});
+    client.on("error", (err) => {
+      console.log("[MQTT] Erro no client", err);
+    });
     client.on("message", (t, payload) => {
       const raw = payload.toString();
-      if (t === singleLightCallbackTopic) {
-        const perLightUpdate = parseLightUpdate(raw);
+      const isCallbackTopic =
+        t === responseTopic || t === singleLightCallbackTopic;
+      let perLightUpdate: SingleLightCallback | null = null;
+      if (isCallbackTopic) {
+        perLightUpdate = parseLightUpdate(raw);
         if (perLightUpdate) {
           if (perLightUpdate.ok !== false) {
             lightStates[perLightUpdate.lightId] = perLightUpdate.on;
@@ -380,37 +382,36 @@ function ensureClient() {
         }
       }
       if (t === responseTopic) {
-        if (!awaitingGlobalToggleAck) {
-          return;
-        }
-        console.log("[MQTT] Global resposta RAW", { t, raw });
-        try {
-          const json = JSON.parse(raw);
-          let reported: boolean | null = null;
-          if (json && typeof json === "object") {
-            if (json.luz === true) reported = true;
-            else if (json.luz === false) reported = false;
-          }
-          if (reported !== null) {
-            toggleOn = reported;
-            lightStates[1] = reported;
-            const evt = {
-              kind: "toggle",
-              on: toggleOn,
-              topic: responseTopic,
-              raw,
-              time: Date.now(),
-              lights: getLightsStatus(),
-            };
-            try {
-              bus.emit("mqtt", evt);
-            } catch (emitErr) {
-              console.log("[MQTT] SSE consumidor desconectado", emitErr);
+        if (awaitingGlobalToggleAck) {
+          console.log("[MQTT] Global resposta RAW", { t, raw });
+          try {
+            const json = JSON.parse(raw) as Record<string, unknown>;
+            const reported =
+              (perLightUpdate?.lightId === 1 ? perLightUpdate.on : null) ??
+              parseBoolean(json.on) ??
+              parseBoolean(json.ligada) ??
+              (typeof json.luz === "boolean" ? json.luz : null);
+            if (typeof reported === "boolean") {
+              toggleOn = reported;
+              lightStates[1] = reported;
+              const evt = {
+                kind: "toggle",
+                on: toggleOn,
+                topic: responseTopic,
+                raw,
+                time: Date.now(),
+                lights: getLightsStatus(),
+              };
+              try {
+                bus.emit("mqtt", evt);
+              } catch (emitErr) {
+                console.log("[MQTT] SSE consumidor desconectado", emitErr);
+              }
+              console.log("[MQTT] Global estado atualizado", evt);
             }
-            console.log("[MQTT] Global estado atualizado", evt);
+          } catch (e) {
+            console.log("[MQTT] Falha ao processar resposta", e);
           }
-        } catch (e) {
-          console.log("[MQTT] Falha ao processar resposta", e);
         }
       }
       const isHeartbeatTopic = heartbeatSubscribeTopics.some((topic) => {
@@ -483,7 +484,28 @@ function ensureClient() {
 export async function publishToggleAwaitOk(timeoutMs = 15000) {
   const targetOn = !toggleOn;
   const message = targetOn ? "liga luz 1" : "desligue a luz 1";
-  const c = ensureClient();
+  if (!controlTopic) {
+    return {
+      ok: false,
+      on: toggleOn,
+      topic: controlTopic,
+      message,
+      lights: getLightsStatus(),
+    };
+  }
+  let c: mqtt.MqttClient;
+  try {
+    c = ensureClient();
+  } catch (err) {
+    return {
+      ok: false,
+      on: toggleOn,
+      topic: controlTopic,
+      message:
+        err instanceof Error ? err.message : "Falha ao conectar ao broker",
+      lights: getLightsStatus(),
+    };
+  }
   awaitingGlobalToggleAck = true;
   console.log("[MQTT] Iniciando toggle", {
     brokerUrl: resolveBrokerUrl(),
@@ -493,14 +515,25 @@ export async function publishToggleAwaitOk(timeoutMs = 15000) {
     timeoutMs,
   });
   const okPromise = new Promise<boolean>((resolve) => {
-    const handler = (evt: { kind?: string; on?: boolean }) => {
-      if (evt.kind === "toggle" && evt.on === targetOn) {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const handler = (evt: {
+      kind?: string;
+      on?: boolean;
+      lightId?: number;
+    }) => {
+      const isToggle = evt.kind === "toggle" && evt.on === targetOn;
+      const isLight1Callback =
+        evt.kind === "single-light-callback" &&
+        evt.lightId === 1 &&
+        evt.on === targetOn;
+      if (isToggle || isLight1Callback) {
         bus.off("mqtt", handler as any);
+        if (timeoutId) clearTimeout(timeoutId);
         resolve(true);
       }
     };
     bus.on("mqtt", handler as any);
-    setTimeout(() => {
+    timeoutId = setTimeout(() => {
       bus.off("mqtt", handler as any);
       console.log("[MQTT] Timeout aguardando OK", { responseTopic, timeoutMs });
       resolve(false);
@@ -533,6 +566,16 @@ export async function publishLightState(
   targetOn: boolean,
   timeoutMs = 10000,
 ) {
+  if (!singleLightRequestTopic) {
+    return {
+      ok: false,
+      message: "MQTT_REQUEST_TOPIC não definido",
+      lightId,
+      on: targetOn,
+      topic: singleLightRequestTopic,
+      lights: getLightsStatus(),
+    };
+  }
   if (!Number.isInteger(lightId) || lightId < 1 || lightId > LIGHT_COUNT) {
     return {
       ok: false,
@@ -543,46 +586,46 @@ export async function publishLightState(
       lights: getLightsStatus(),
     };
   }
-  if (lightId === 1) {
-    const currentOn = Boolean(lightStates[1]);
-    if (currentOn === targetOn) {
-      return {
-        ok: true,
-        message: "Callback confirmado",
-        lightId,
-        on: currentOn,
-        topic: controlTopic,
-        lights: getLightsStatus(),
-      };
-    }
-    const result = await publishToggleAwaitOk(timeoutMs);
+  const currentOn = Boolean(lightStates[lightId]);
+  if (currentOn === targetOn) {
     return {
-      ok: result.ok,
-      message: result.ok
-        ? "Callback confirmado"
-        : "Timeout aguardando callback JSON",
+      ok: true,
+      message: "Callback confirmado",
       lightId,
-      on: Boolean(result.lights[1]),
-      topic: result.topic,
-      lights: result.lights,
+      on: currentOn,
+      topic: singleLightRequestTopic,
+      lights: getLightsStatus(),
     };
   }
-  const c = ensureClient();
-  const requestId = `light-${lightId}-${Date.now()}-${Math.random()
-    .toString(16)
-    .slice(2, 8)}`;
+  let c: mqtt.MqttClient;
+  try {
+    c = ensureClient();
+  } catch (err) {
+    return {
+      ok: false,
+      message:
+        err instanceof Error ? err.message : "Falha ao conectar ao broker",
+      lightId,
+      on: targetOn,
+      topic: singleLightRequestTopic,
+      lights: getLightsStatus(),
+    };
+  }
+  const requestId = `${lightId}${Date.now().toString(36)}${Math.random()
+    .toString(36)
+    .slice(2, 5)}`;
   const message = JSON.stringify({
     requestId,
     lightId,
     on: targetOn,
     action: targetOn ? `liga luz ${lightId}` : `desligue a luz ${lightId}`,
-    command: targetOn ? "turn_on" : "turn_off",
   });
   const callbackPromise = new Promise<{
     ok: boolean;
     message: string;
     requestId?: string;
   }>((resolve) => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const handler = (evt: {
       kind?: string;
       lightId?: number;
@@ -595,7 +638,7 @@ export async function publishLightState(
       const sameRequest = evt.requestId && evt.requestId === requestId;
       const fallbackMatch = !evt.requestId && evt.lightId === lightId;
       if (!sameRequest && !fallbackMatch) return;
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       bus.off("mqtt", handler as any);
       resolve({
         ok: evt.ok !== false,
@@ -604,7 +647,7 @@ export async function publishLightState(
       });
     };
     bus.on("mqtt", handler as any);
-    const timeoutId = setTimeout(() => {
+    timeoutId = setTimeout(() => {
       bus.off("mqtt", handler as any);
       resolve({
         ok: false,
@@ -671,7 +714,19 @@ export async function publishWifiConfig(payload: {
   ssid: string;
   password: string;
 }) {
-  const c = ensureClient();
+  if (!wifiTopic) {
+    return { ok: false, message: "MQTT_WIFI_TOPIC não definido" };
+  }
+  let c: mqtt.MqttClient;
+  try {
+    c = ensureClient();
+  } catch (err) {
+    return {
+      ok: false,
+      message:
+        err instanceof Error ? err.message : "Falha ao conectar ao broker",
+    };
+  }
   const jsonEscape = (s: string) =>
     s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   const data = `{"ssid":"${jsonEscape(payload.ssid)}","password":"${jsonEscape(
