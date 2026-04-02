@@ -615,7 +615,7 @@ export async function publishLightState(
       lights: getLightsStatus(),
     };
   }
-  const message = JSON.stringify({ lightId });
+  const message = JSON.stringify({ lightId, on: targetOn });
   const callbackPromise = new Promise<{
     ok: boolean;
     message: string;
