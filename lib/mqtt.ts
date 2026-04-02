@@ -82,6 +82,22 @@ function parseNumber(value: unknown) {
   return null;
 }
 
+function parseBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "on")
+      return true;
+    if (normalized === "false" || normalized === "0" || normalized === "off")
+      return false;
+  }
+  return null;
+}
+
 function parseLightUpdate(raw: string) {
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -90,7 +106,9 @@ function parseLightUpdate(raw: string) {
     const action =
       typeof json.action === "string" ? json.action.trim().toLowerCase() : "";
     const parsedAction = (() => {
-      const match = action.match(/(liga|desliga)\s+luz\s+(\d+)/i);
+      const match = action.match(
+        /(liga|ligue|desliga|desligue|desligar)\s+(?:a\s+)?luz\s+(\d+)/i,
+      );
       if (!match) return null;
       return {
         verb: match[1].toLowerCase(),
@@ -106,15 +124,10 @@ function parseLightUpdate(raw: string) {
       parseNumber(json.id) ??
       actionLightId;
     const candidateOn =
-      typeof json.on === "boolean"
-        ? json.on
-        : typeof json.luz === "boolean"
-          ? json.luz
-          : typeof json.ligada === "boolean"
-            ? json.ligada
-            : typeof json.state === "boolean"
-              ? json.state
-              : null;
+      parseBoolean(json.on) ??
+      parseBoolean(json.luz) ??
+      parseBoolean(json.ligada) ??
+      parseBoolean(json.state);
     if (!candidateId) return null;
     if (candidateId < 1 || candidateId > LIGHT_COUNT) return null;
     const requestId =
@@ -133,8 +146,14 @@ function parseLightUpdate(raw: string) {
           : undefined;
     const effectiveOn = (() => {
       if (typeof candidateOn === "boolean") return candidateOn;
-      if (parsedAction?.verb === "liga") return true;
-      if (parsedAction?.verb === "desliga") return false;
+      if (parsedAction?.verb === "liga" || parsedAction?.verb === "ligue")
+        return true;
+      if (
+        parsedAction?.verb === "desliga" ||
+        parsedAction?.verb === "desligue" ||
+        parsedAction?.verb === "desligar"
+      )
+        return false;
       if (callbackOk === false) return Boolean(lightStates[candidateId]);
       return null;
     })();
@@ -524,12 +543,40 @@ export async function publishLightState(
       lights: getLightsStatus(),
     };
   }
+  if (lightId === 1) {
+    const currentOn = Boolean(lightStates[1]);
+    if (currentOn === targetOn) {
+      return {
+        ok: true,
+        message: "Callback confirmado",
+        lightId,
+        on: currentOn,
+        topic: controlTopic,
+        lights: getLightsStatus(),
+      };
+    }
+    const result = await publishToggleAwaitOk(timeoutMs);
+    return {
+      ok: result.ok,
+      message: result.ok
+        ? "Callback confirmado"
+        : "Timeout aguardando callback JSON",
+      lightId,
+      on: Boolean(result.lights[1]),
+      topic: result.topic,
+      lights: result.lights,
+    };
+  }
   const c = ensureClient();
   const requestId = `light-${lightId}-${Date.now()}-${Math.random()
     .toString(16)
     .slice(2, 8)}`;
   const message = JSON.stringify({
-    action: targetOn ? `liga luz ${lightId}` : `desliga luz ${lightId}`,
+    requestId,
+    lightId,
+    on: targetOn,
+    action: targetOn ? `liga luz ${lightId}` : `desligue a luz ${lightId}`,
+    command: targetOn ? "turn_on" : "turn_off",
   });
   const callbackPromise = new Promise<{
     ok: boolean;

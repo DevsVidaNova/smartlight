@@ -150,9 +150,8 @@ export function ToggleCard() {
   async function toggleAllLights() {
     if (bulkPending) return;
     const previousLights = { ...lights };
-    const allOn =
-      Object.values(previousLights).filter(Boolean).length === LIGHT_COUNT;
-    const targetOn = !allOn;
+    const hasAnyOn = Object.values(previousLights).some(Boolean);
+    const targetOn = !hasAnyOn;
     const targetLightIds = Array.from(
       { length: LIGHT_COUNT },
       (_, index) => index + 1,
@@ -301,7 +300,7 @@ export function ToggleCard() {
 
   const isOn = !!status?.on;
   const activeLights = Object.values(lights).filter(Boolean).length;
-  const allLightsOn = activeLights === LIGHT_COUNT;
+  const hasAnyLightOn = activeLights > 0;
   const statusLightId = lastLightStatus?.lightId ?? 1;
   const statusLightOn = lastLightStatus
     ? lastLightStatus.on
@@ -316,11 +315,17 @@ export function ToggleCard() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Button
-              className="h-12 w-full"
+              className={`h-12 w-full text-white ${
+                hasAnyLightOn
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-red-600 hover:bg-red-700"
+              }`}
               onClick={toggleAllLights}
               disabled={bulkPending}
             >
-              {allLightsOn ? "Desligar todas as luzes" : "Ligar todas as luzes"}
+              {hasAnyLightOn
+                ? "Desligar todas as luzes"
+                : "Ligar todas as luzes"}
             </Button>
             <Button
               className="h-12 w-full"
